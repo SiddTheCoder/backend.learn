@@ -1,9 +1,9 @@
 import mongoose, {Schema} from "mongoose";
-import jwt from "jwt";
+import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
 const userSchema = new Schema({
-    name: {
+    username: {
         type : 'string',
         required : true,
         lowercase : true,
@@ -33,7 +33,6 @@ const userSchema = new Schema({
     },
     coverImage: {
         type : 'string', // url link from cloudnary server
-        required : true,
     },
     wtachHistory: {
         type : [
@@ -52,7 +51,7 @@ const userSchema = new Schema({
 //bcrpyt password just before saving
 userSchema.pre('save', async function(next){
     if(!this.isModified('password')) return next()
-    this.password = bcrypt.hash(this.password, 10)
+    this.password = await bcrypt.hash(this.password, 10)
     next()
 })
 
@@ -90,4 +89,4 @@ userSchema.methods.generateRefreshToken = function(){
     )
 }
 
-export const User = mongoose.model('User', userSchema)
+export const User = mongoose.model('User', userSchema, 'users')

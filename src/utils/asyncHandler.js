@@ -1,10 +1,20 @@
 const asyncHandler = (requestHandler) => async (req, res, next) => {
     try {
-        await requestHandler(req, res, next)
-    } catch (error) {
-        res.status(err.code || 500).json({
+        return await requestHandler(req, res, next);
+    } catch (err) {
+        console.error("Async Error:", err); // Log the error for debugging
+
+        // Ensure the status code is valid (between 100 and 599)
+        const statusCode = err.statusCode && err.statusCode >= 100 && err.statusCode < 600 
+            ? err.statusCode 
+            : 500;
+
+        res.status(statusCode).json({
             success: false,
-            message: err.message
-        })
+            statuscode: statusCode,
+            message: err.message || "Internal Server Error",
+        });
     }
-}
+};
+
+export { asyncHandler };
