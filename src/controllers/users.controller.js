@@ -38,7 +38,7 @@ const registerUser = asyncHandler( async (req, res) => {
     const {username,email,fullName,password} = req.body 
  
     // validate fields
-    if( [username,email,fullName,password].some( (field) => field.trim() === '' ) ) {
+    if( [username,email,fullName,password].some( (field) => field?.trim() === '' ) ) {
         throw new ApiError(400,'All fields are required')
     }
 
@@ -49,7 +49,6 @@ const registerUser = asyncHandler( async (req, res) => {
     if( existedUser.length > 0 ) throw new ApiError(400,'Username or Email is already registered')
 
     // uplaod avatar and coverImage to local server by multer
-    console.log(req.files)
     const avatarLocalPath = req.files?.avatar?.length ? req.files.avatar[0].path : null;
     const coverImageLocalPath = req.files?.coverImage?.length ? req.files.coverImage[0].path : null;
     
@@ -63,11 +62,11 @@ const registerUser = asyncHandler( async (req, res) => {
 
     // create a new user object - entry into database
     const user =  await User.create({
-        username : username.toLowerCase(),
-        email : email.toLowerCase(),
+        username : username?.toLowerCase(),
+        email : email?.toLowerCase(),
         fullName,
         password,
-        avatar : avatar.url,
+        avatar : avatar?.url ,
         coverImage : coverImage?.url || "" ,
     }) 
     
@@ -211,4 +210,163 @@ const refreshAccessToken = asyncHandler( async (req, res) => {
     }
 })
 
-export { registerUser , loginUser, logoutUser , refreshAccessToken}
+const changeCurrentPassword = asyncHandler( async (req, res) => {
+    // Get current password
+    const {oldPassword, newPassword} = req.body
+
+    if(!oldPassword || !newPassword) throw new ApiError(400,`Invalid password`)
+    // Get user from middleware chain 
+    const user = await User.findById(req.user?._id)
+    if(!user) throw new ApiError(404, "User not found ")
+    // compare with old password
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    // if not correct throw error 400 - Incorrect old password
+    if(!isPasswordCorrect) throw new ApiError(400,'Incorrect old password')
+      
+    // Get new password in user object    
+    user.password = newPassword
+    // Save new password to database  (validateBeforeSave: false to prevent mongoose from validating password)  // mongoose automatically encrypts password before saving it to db  (not in this case)
+    await user.save({validateBeforeSave: false})    
+
+    // send response to client  // user object is not returned because password is encrypted and not in user object
+    return res
+    .status(200)
+    .json( new ApiResponse(
+            200,
+             {},
+             'Password changed successfully'
+         ) 
+    )
+} )
+
+const getCurrentUser = asyncHandler( async (req, res) => {
+    // Get user from middleware chain  // req.user is coming from verifyJWT middleware 
+    const currentUser = req.user 
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            currentUser,
+            'User retrieved successfully'
+        )
+    )
+})
+
+const updateAccountDetails = asyncHandler( async (req, res) => {
+    // get updated account details from request body  // req.user is coming from verifyJWT middleware  // req.user._id is coming from verifyJWT middleware  // findByIdAndUpdate method returns updated user object  // select method is used to exclude password and refreshToken from updated user object  // new : true is used to return updated user object  // mongoose automatically encrypts password before saving it to db  (not in this case)  // findByIdAndUpdate method returns updated user object
+    const {email, username, fullName} = req.body
+
+    if(!(email || username || fullName)) {
+        throw new ApiError(400,'All fields are required')
+    }
+
+   const user =  await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set  : {
+                email : email?.toLowerCase(),
+                username : username?.toLowerCase(),
+                fullName
+            }
+        },
+        { new : true}
+    ).select('-password -refreshToken')
+
+    // if(!user) throw new ApiError(500, 'User not found', user)
+    console.log(req.user._id)
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user,
+            'Account details updated successfully'
+        )
+    )
+})
+
+const updateUserAvatar = asyncHandler( async(req, res) => {
+    // get updated avatar from request body  // req.user is coming from verifyJWT middleware  // req.user._id is coming from verifyJWT middleware  // findByIdAndUpdate method returns updated user object  // select method is used to exclude password and refreshToken from updated user object  // new : true is used to return updated user object  // mongoose automatically encrypts password before saving it to db  (not in this case)  // findByIdAndUpdate method returns updated user object
+
+    const avatarLocalPath = req.file?.path
+    console.log('Files : --',req.file)
+    if(!avatarLocalPath) throw new ApiError(404, 'Avatar Not Found')
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+
+    if(!avatar) throw new ApiError(404, 'Error while uploading avatarr on cloudinary')
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set : {avatar : avatar.url}
+        },
+        {new : true}
+    ).select('-password -refreshToken')   
+    
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user,
+            'Avatar updated successfully'
+        )
+    )
+})
+
+const updateUserCoverImage = asyncHandler( async(req, res) => {
+    // get updated cover image from request body  // req.user is coming from verifyJWT middleware  // req.user._id is coming from verifyJWT middleware  // findByIdAndUpdate method returns updated user object  // select method is used to exclude password and refreshToken from updated user object  // new : true is used to return updated user object  // mongoose automatically encrypts password before saving it to db  (not in this case)  // findByIdAndUpdate method returns updated user object
+
+    const coverLocalPath = req.file?.path
+    if(!coverLocalPath) throw new ApiError(404, 'Cover Image Not Found')
+    const coverImage = await uploadOnCloudinary(coverLocalPath)
+    if(!coverImage) throw new ApiError(404, 'Error uploading cover image on cloudinary')  
+        
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set : {coverImage : coverImage.url}
+        },
+        {new : true}
+    ).select('-password -refreshToken')
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user,
+            'Cover Image updated successfully'
+        )
+    )
+} );
+
+const deletAccount = asyncHandler( async (req, res) => {
+    
+        const {username, password} = req.body
+        if(!username || !password) throw new ApiError(400,'Username and Password must be provided')
+
+        const user = await User.findById(req.user?._id)    
+        const isPasswordCorrect = await user.isPasswordCorrect(password)
+        if(!isPasswordCorrect) throw new ApiError(400,'Incorrect Password')
+
+        await User.findByIdAndDelete(req.user?._id)
+    
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            {},
+            'Account deleted successfully'
+        )
+    )
+})
+
+
+
+
+export { registerUser , loginUser, logoutUser , refreshAccessToken , changeCurrentPassword ,  getCurrentUser , updateAccountDetails, updateUserAvatar , updateUserCoverImage , deletAccount }
