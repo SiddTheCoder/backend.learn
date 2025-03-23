@@ -34,7 +34,7 @@ const userSchema = new Schema({
     coverImage: {
         type : 'string', // url link from cloudnary server
     },
-    wtachHistory: {
+    watchHistory: {
         type : [
             {
                 type : Schema.Types.ObjectId,
