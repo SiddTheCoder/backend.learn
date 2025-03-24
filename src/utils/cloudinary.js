@@ -18,18 +18,18 @@ const uploadOnCloudinary  = async function(localFilePath){
         console.log('File uploaded successfully to cloudinary ', response.url);
 
         // delete the file from local server
-        setTimeout(() => {
-            fs.unlinkSync(localFilePath); // delete the file
-        }, 3000);
+        // setTimeout(() => {
+        //     fs.unlinkSync(localFilePath); // delete the file
+        // }, 3000);
 
         // return the response to user
         return response;
 
     } catch (error) {
         //   delete the file from local server
-          setTimeout(() => {
-            fs.unlinkSync(localFilePath); // delete the file
-        }, 3000);
+        //   setTimeout(() => {
+        //     fs.unlinkSync(localFilePath); // delete the file
+        // }, 3000);
         console.error('Error uploading file to cloudinary ', error);
     }
 }
