@@ -2,7 +2,7 @@ const asyncHandler = (requestHandler) => async (req, res, next) => {
     try {
         return await requestHandler(req, res, next);
     } catch (err) {
-        console.error("Async Error:", err); // Log the error for debugging
+        console.error("Async Error:", err); 
 
         // Ensure the status code is valid (between 100 and 599)
         const statusCode = err.statusCode && err.statusCode >= 100 && err.statusCode < 600 
